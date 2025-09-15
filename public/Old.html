@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Aura Conversation</title>
+  <style>
+    /* Cosmic animated background */
+    body {
+      margin: 0;
+      font-family: "Segoe UI", sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      background: radial-gradient(circle at top, #1a002b, #000010);
+      color: #fff;
+      text-align: center;
+      padding: 20px;
+      overflow: hidden;
+    }
+
+    /* Stars (CSS animation) */
+    .stars, .stars2, .stars3 {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      top: 0; left: 0;
+      background: transparent;
+      z-index: -1;
+    }
+    .stars { 
+      background: transparent url("https://www.script-tutorials.com/demos/360/images/stars.png") repeat;
+      animation: moveStars 200s linear infinite;
+    }
+    .stars2 {
+      background: transparent url("https://www.script-tutorials.com/demos/360/images/stars2.png") repeat;
+      animation: moveStars 400s linear infinite;
+    }
+    .stars3 {
+      background: transparent url("https://www.script-tutorials.com/demos/360/images/stars3.png") repeat;
+      animation: moveStars 600s linear infinite;
+    }
+    @keyframes moveStars {
+      from { background-position: 0 0; }
+      to { background-position: -10000px 5000px; }
+    }
+
+    h1 {
+      margin-bottom: 20px;
+      font-size: 2.2em;
+      text-shadow: 0 0 20px #ff00e5;
+      z-index: 1;
+    }
+
+    #username {
+      margin-bottom: 10px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 1em;
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      border: 1px solid rgba(255, 0, 229, 0.4);
+      text-align: center;
+      z-index: 1;
+    }
+
+    #connect {
+      padding: 15px 40px;
+      font-size: 1.2em;
+      color: white;
+      background: linear-gradient(90deg, #6a00f4, #ff00e5);
+      border: none;
+      border-radius: 30px;
+      cursor: pointer;
+      box-shadow: 0 0 25px rgba(255, 0, 229, 0.9), 0 0 50px rgba(106, 0, 244, 0.7);
+      transition: all 0.3s ease, transform 0.2s ease-in-out;
+      z-index: 1;
+    }
+    #connect:hover {
+      box-shadow: 0 0 40px rgba(255, 0, 229, 1), 0 0 80px rgba(106, 0, 244, 1);
+      transform: scale(1.1);
+    }
+
+    #status {
+      margin-top: 15px;
+      padding: 10px 20px;
+      font-size: 1.1em;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 15px;
+      box-shadow: 0 0 20px rgba(255, 0, 229, 0.4);
+      z-index: 1;
+    }
+
+    #chat {
+      margin-top: 30px;
+      width: 100%;
+      max-width: 600px;
+      height: 300px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 15px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 15px;
+      box-shadow: 0 0 15px rgba(255, 0, 229, 0.2);
+      z-index: 1;
+    }
+
+    .message {
+      padding: 10px 15px;
+      border-radius: 15px;
+      max-width: 75%;
+      word-wrap: break-word;
+    }
+    .user {
+      align-self: flex-end;
+      background: linear-gradient(90deg, #6a00f4, #ff00e5);
+      box-shadow: 0 0 10px rgba(255, 0, 229, 0.6);
+    }
+    .aura {
+      align-self: flex-start;
+      background: rgba(255, 255, 255, 0.1);
+      box-shadow: 0 0 10px rgba(106, 0, 244, 0.6);
+    }
+  </style>
+</head>
+<body>
+  <!-- Animated stars -->
+  <div class="stars"></div>
+  <div class="stars2"></div>
+  <div class="stars3"></div>
+
+  <h1>🌌 Aura AI Conversation</h1>
+
+  <!-- Name input -->
+  <input type="text" id="username" placeholder="Enter your name" />
+
+  <button id="connect">Start Conversation</button>
+  <div id="status">✨ Awaiting your call, Seeker…</div>
+
+  <div id="chat"></div>
+
+  <audio id="bg-music" src="calm-music.mp3" loop></audio>
+
+  <script>
+    const connectBtn = document.getElementById("connect");
+    const statusEl = document.getElementById("status");
+    const usernameInput = document.getElementById("username");
+    const chatBox = document.getElementById("chat");
+
+    function addMessage(text, sender) {
+      const msg = document.createElement("div");
+      msg.classList.add("message", sender);
+      msg.innerText = text;
+      chatBox.appendChild(msg);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    usernameInput.addEventListener("input", () => {
+      const name = usernameInput.value.trim() || "Seeker";
+      statusEl.innerText = `✨ Awaiting your call, ${name}…`;
+    });
+
+    connectBtn.onclick = async () => {
+      try {
+        connectBtn.disabled = true;
+        connectBtn.innerText = "Connecting…";
+        statusEl.innerText = "🌠 Aligning with the universal flow…";
+
+        console.log("▶ Fetching session...");
+        const resp = await fetch("/session");
+        // If the server responded with an error, extract the message
+        // before throwing so we can surface a helpful hint to the user.
+        if (!resp.ok) {
+          let errMsg = `Failed to fetch /session`;
+          try {
+            const errData = await resp.clone().json();
+            if (errData && errData.error) errMsg = errData.error;
+          } catch (_) {}
+          throw new Error(errMsg);
+        }
+
+        const data = await resp.json();
+        console.log("✅ Session response:", data);
+
+        const EPHEMERAL_KEY = data.client_secret?.value;
+        if (!EPHEMERAL_KEY) throw new Error("No ephemeral key returned");
+        console.log("🔑 Ephemeral key:", EPHEMERAL_KEY);
+
+        console.log("🎤 Setting up mic + WebRTC...");
+        const pc = new RTCPeerConnection();
+	// Monitor connection state
+pc.onconnectionstatechange = () => {
+  console.log("🔄 Connection state:", pc.connectionState);
+  if (pc.connectionState === "failed" || pc.connectionState === "disconnected") {
+    statusEl.innerText = "⚠️ Connection lost — click to reconnect.";
+    connectBtn.disabled = false;
+    connectBtn.innerText = "🔁 Reconnect to Aura";
+  }
+};
+
+
+        // Play AI audio
+        const audioEl = document.createElement("audio");
+        audioEl.autoplay = true;
+        pc.ontrack = (event) => {
+          audioEl.srcObject = event.streams[0];
+        };
+
+        // Mic input
+        const ms = await navigator.mediaDevices.getUserMedia({ audio: true });
+        ms.getTracks().forEach((track) => pc.addTrack(track, ms));
+        console.log("🎤 Mic attached");
+
+        // Data channel
+        const dc = pc.createDataChannel("oai-events");
+        dc.onmessage = (e) => {
+          try {
+            const event = JSON.parse(e.data);
+            if (event.type === "response.output_text.delta") {
+              addMessage(event.delta, "aura");
+            }
+          } catch {
+            console.log("AI Event:", e.data);
+          }
+        };
+
+        // Create offer
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+
+        console.log("📡 Sending offer to OpenAI...");
+        const sdpResponse = await fetch(
+          "https://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17",
+          {
+            method: "POST",
+            body: offer.sdp,
+            headers: {
+              Authorization: `Bearer ${EPHEMERAL_KEY}`,
+              "Content-Type": "application/sdp",
+            },
+          }
+        );
+
+        if (!sdpResponse.ok) {
+          const errorText = await sdpResponse.text();
+          console.error("OpenAI SDP error:", errorText);
+          statusEl.innerText = "🌑 The ether is quiet… shall we try again?";
+          connectBtn.disabled = false;
+          connectBtn.innerText = "🔁 Reconnect to Aura";
+          return;
+        }
+
+        const answerSdp = await sdpResponse.text();
+        await pc.setRemoteDescription({ type: "answer", sdp: answerSdp });
+
+        statusEl.innerText = "🌌 The universe is listening…";
+        connectBtn.innerText = "✨ Listening…";
+
+      } catch (err) {
+        // Display a more informative error if one is provided. When the server
+        // returns a JSON error (for example, when OPENAI_API_KEY is missing),
+        // err.message will contain that error. Otherwise we fall back to the
+        // generic connection failure message.
+        console.error("❌ Connection error:", err);
+        const errorMessage = err && err.message ? err.message : null;
+        if (errorMessage) {
+          statusEl.innerText = `⚠️ ${errorMessage}`;
+        } else {
+          statusEl.innerText = "🌑 The connection faltered — shall we try again?";
+        }
+        connectBtn.disabled = false;
+        connectBtn.innerText = "🔁 Reconnect to Aura";
+      }
+    };
+  </script>
+</body>
+</html>

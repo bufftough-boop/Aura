@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Aura</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500&family=Noto+Serif+Display:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: 'Noto Sans', sans-serif;
+      background-color: black;
+    }
+    h1 { font-family: 'Noto Serif Display', serif; }
+    #starfield {
+      position: fixed; top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: -1;
+      background: radial-gradient(ellipse at bottom, #0d1d31 0%, #0c0d13 100%);
+    }
+  </style>
+</head>
+<body class="h-screen flex items-center justify-center text-white">
+
+  <!-- Starfield -->
+  <canvas id="starfield"></canvas>
+
+  <!-- Aura Card -->
+  <div class="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-6 sm:p-10 max-w-lg w-full mx-4 text-center shadow-2xl relative z-10 flex flex-col">
+
+    <!-- Header -->
+    <div class="mb-6">
+      <h1 class="text-3xl sm:text-4xl font-light mb-2 text-yellow-200">Talk to Aura</h1>
+      <p class="text-gray-300 text-base sm:text-lg italic">“A gentle voice, always here for you.”</p>
+    </div>
+
+    <!-- Voice Button -->
+    <div class="mb-6">
+      <button id="voiceBtn"
+        onclick="toggleVoice()"
+        class="w-full px-6 py-3 sm:px-10 sm:py-4 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full text-lg font-medium shadow-lg hover:scale-105 transition font-serif">
+        🎤 Speak Your Heart
+      </button>
+    </div>
+
+    <!-- Text Input -->
+    <textarea id="userInput"
+      placeholder="Or type your thoughts here..."
+      class="w-full h-24 sm:h-28 p-3 rounded-xl bg-white/5 border border-white/20 text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-400 mb-4 resize-none"></textarea>
+
+    <!-- Send Button -->
+    <button onclick="sendMessage()"
+      class="w-full py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 transition font-serif">
+      📩 Send to Aura
+    </button>
+
+    <!-- Chat Window -->
+    <div id="chat"
+      class="mt-6 flex-1 overflow-y-auto text-left space-y-2 p-3 bg-black/20 rounded-xl border border-white/10 min-h-[200px] max-h-[300px] sm:max-h-[400px]"></div>
+
+    <!-- Footer -->
+    <p class="mt-6 text-xs text-gray-400 italic">
+      Every message becomes part of your Aura ✨
+    </p>
+  </div>
+
+  <script>
+    // 🌌 STARFIELD BACKGROUND
+    const canvas = document.getElementById("starfield");
+    const ctx = canvas.getContext("2d");
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    const stars = Array.from({ length: 200 }, () => ({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      r: Math.random() * 1.5,
+      o: Math.random()
+    }));
+    function drawStars() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (let star of stars) {
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255,255,255,${star.o})`;
+        ctx.fill();
+        star.o += (Math.random() - 0.5) * 0.02;
+        if (star.o < 0.2) star.o = 0.2;
+        if (star.o > 1) star.o = 1;
+      }
+      requestAnimationFrame(drawStars);
+    }
+    drawStars();
+    window.onresize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
+
+    // 💬 CHAT LOGIC
+    const chat = document.getElementById("chat");
+    const input = document.getElementById("userInput");
+    const voiceBtn = document.getElementById("voiceBtn");
+    let pc = null; let dc = null; let voiceActive = false; let currentBubble = null;
+
+    async function sendMessage() {
+      const msg = input.value.trim();
+      if (!msg) return;
+      chat.innerHTML += `<div class="text-right"><div class="inline-block bg-purple-600 rounded-xl px-4 py-2">${msg}</div></div>`;
+      input.value = "";
+      chat.scrollTop = chat.scrollHeight;
+      const res = await fetch("/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: msg }),
+      });
+      const data = await res.json();
+      chat.innerHTML += `<div class="text-left"><div class="inline-block bg-indigo-600 rounded-xl px-4 py-2">${data.reply}</div></div>`;
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    input.addEventListener("keypress", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+    });
+
+    // 🎤 REALTIME VOICE CHAT
+    async function toggleVoice() {
+      if (voiceActive) {
+        pc.close(); pc = null; voiceActive = false;
+        voiceBtn.innerText = "🎤 Speak Your Heart"; return;
+      }
+      const res = await fetch("/session"); const data = await res.json();
+      const EPHEMERAL_KEY = data.client_secret.value;
+      pc = new RTCPeerConnection();
+      const audioEl = document.createElement("audio"); audioEl.autoplay = true;
+      pc.ontrack = (event) => { audioEl.srcObject = event.streams[0]; };
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+      dc = pc.createDataChannel("oai-events");
+      dc.onmessage = (e) => {
+        try {
+          const msg = JSON.parse(e.data);
+          if (msg.type === "response.output_text.delta") {
+            if (!currentBubble) {
+              currentBubble = document.createElement("div");
+              currentBubble.className = "text-left";
+              currentBubble.innerHTML = `<div class="inline-block bg-indigo-600 rounded-xl px-4 py-2" id="streaming-text"></div>`;
+              chat.appendChild(currentBubble);
+            }
+            const bubbleText = currentBubble.querySelector("#streaming-text");
+            bubbleText.textContent += msg.text;
+            chat.scrollTop = chat.scrollHeight;
+          }
+          if (msg.type === "response.output_text.done") {
+            currentBubble = null;
+          }
+        } catch { console.log("Non-JSON message:", e.data); }
+      };
+      const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
+      const sdpResponse = await fetch("https://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17", {
+        method: "POST", body: offer.sdp,
+        headers: { Authorization: `Bearer ${EPHEMERAL_KEY}`, "Content-Type": "application/sdp" },
+      });
+      const answer = { type: "answer", sdp: await sdpResponse.text() };
+      await pc.setRemoteDescription(answer);
+      voiceActive = true; voiceBtn.innerText = "🛑 Stop Voice";
+    }
+  </script>
+</body>
+</html>
